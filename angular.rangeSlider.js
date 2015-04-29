@@ -60,7 +60,7 @@
                     showValues: true,
                     preventEqualMinMax: false,
                     attachHandleValues: false,
-                    broadcastModelPosition: false
+                    onModelPositionChange: false
                 },
 
                 // Determine the events to bind. IE11 implements pointerEvents without
@@ -130,7 +130,7 @@
                     pinHandle: '@',
                     preventEqualMinMax: '@',
                     attachHandleValues: '@',
-                    broadcastModelPosition: '&'
+                    onModelPositionChange: '&'
                 };
 
             if (legacySupport) {
@@ -289,7 +289,7 @@
 
                     attrs.$observe('onModelPositionChange', function (val) {
                         if (!angular.isDefined(val)) {
-                            scope.onModelPositionChange = defaults.broadcastModelPosition;
+                            scope.onModelPositionChange = defaults.onModelPositionChange;
                         } else {
                             scope.onModelPositionChange = val;
                         }
