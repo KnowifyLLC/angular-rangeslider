@@ -287,14 +287,6 @@
                         }
                     });
 
-                    attrs.$observe('onModelPositionChange', function (val) {
-                        if (!angular.isDefined(val)) {
-                            scope.onModelPositionChange = defaults.onModelPositionChange;
-                        } else {
-                            scope.onModelPositionChange = val;
-                        }
-                    });
-
 
                     // listen for changes to values
                     scope.$watch('min', setMinMax);
@@ -469,7 +461,10 @@
                             }
 
                             if (scope.onModelPositionChange) {
-                                scope.onModelPositionChange({ left: handle1pos+'%', right: (100 - handle2pos)+'%' });
+                                var _pos = {};
+                                _pos[pos] = handle1pos + '%';
+                                _pos[posOpp] = (100 - handle2pos) + '%';
+                                scope.onModelPositionChange(_pos);
                             }
 
                         }
