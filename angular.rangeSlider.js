@@ -59,7 +59,8 @@
                     decimalPlaces: 0,
                     showValues: true,
                     preventEqualMinMax: false,
-                    attachHandleValues: false
+                    attachHandleValues: false,
+                    broadcastModelPosition: false
                 },
 
                 // Determine the events to bind. IE11 implements pointerEvents without
@@ -128,7 +129,8 @@
                     showValues: '@',
                     pinHandle: '@',
                     preventEqualMinMax: '@',
-                    attachHandleValues: '@'
+                    attachHandleValues: '@',
+                    broadcastModelPosition: '&'
                 };
 
             if (legacySupport) {
@@ -282,6 +284,14 @@
                             } else {
                                 scope.attachHandleValues = false;
                             }
+                        }
+                    });
+
+                    attrs.$observe('onModelPositionChange', function (val) {
+                        if (!angular.isDefined(val)) {
+                            scope.onModelPositionChange = defaults.broadcastModelPosition;
+                        } else {
+                            scope.onModelPositionChange = val;
                         }
                     });
 
@@ -456,6 +466,10 @@
                                 if (handle1pos > 95) {
                                     angular.element(handles[0]).css('z-index', 3);
                                 }
+                            }
+
+                            if (scope.onModelPositionChange) {
+                                scope.onModelPositionChange({ left: handle1pos+'%', right: (100 - handle2pos)+'%' });
                             }
 
                         }
