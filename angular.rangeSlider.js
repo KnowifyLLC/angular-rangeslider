@@ -60,7 +60,8 @@
                     showValues: true,
                     preventEqualMinMax: false,
                     attachHandleValues: false,
-                    onModelPositionChange: false
+                    onModelPositionChange: false,
+                    handleWidth: 0
                 },
 
                 // Determine the events to bind. IE11 implements pointerEvents without
@@ -130,7 +131,8 @@
                     pinHandle: '@',
                     preventEqualMinMax: '@',
                     attachHandleValues: '@',
-                    onModelPositionChange: '&'
+                    onModelPositionChange: '&',
+                    handleWidth: '@'
                 };
 
             if (legacySupport) {
@@ -284,6 +286,12 @@
                             } else {
                                 scope.attachHandleValues = false;
                             }
+                        }
+                    });
+
+                    attrs.$observe('handleWidth', function(val) {
+                        if (!angular.isDefined(val)) {
+                            scope.handleWidth = defaults.handleWidth;
                         }
                     });
 
@@ -442,7 +450,7 @@
 
                                 // reposition handles
                                 angular.element(handles[0]).css(pos, handle1pos + '%');
-                                angular.element(handles[1]).css(pos, handle2pos + '%');
+                                angular.element(handles[1]).css(pos, 'calc(' + handle2pos + '% - ' + scope.handleWidth + 'px)');
 
                                 if (scope.attachHandleValues) {
                                     // reposition values
@@ -628,6 +636,174 @@
                         });
                     }
 
+                    function handleRangeMove(index) {
+
+                        var $handles = $(handles);
+
+                        // on mousedown / touchstart
+                        join.bind(onEvent + 'X', function(event) {
+
+                            var handleDownClass = 'ngrs-join-down',
+                                //unbind = $handle.add($document).add('body'),
+                                modelValue = (index === 0 ? scope.modelMin : scope.modelMax) - scope.min,
+                                originalPosition = (modelValue / range) * 100,
+                                originalClick = client(event),
+                                previousClick = originalClick,
+                                previousProposal = false;
+
+                            if (angular.isFunction(scope.onHandleDown)) {
+                                scope.onHandleDown();
+                            }
+
+                            // stop user accidentally selecting stuff
+                            angular.element('body').bind('selectstart' + eventNamespace, function() {
+                                return false;
+                            });
+
+                            // only do stuff if we are disabled
+                            if (!scope.disabled) {
+
+                                // flag as down
+                                down = true;
+
+                                // add down class
+                                $handles.each(function () {
+                                    this.addClass('ngrs-down');
+                                });
+
+                                $slider.addClass('ngrs-focus')
+                                join.addClass(handleDownClass);
+
+                                // add touch class for MS styling
+                                angular.element('body').addClass('ngrs-touching');
+
+                                // listen for mousemove / touchmove document events
+                                $document.bind(moveEvent, function(e) {
+                                    // prevent default
+                                    e.preventDefault();
+
+                                    var currentClick = client(e),
+                                        movement,
+                                        proposal,
+                                        other,
+                                        per = (scope.step / range) * 100,
+                                        otherModelPosition = (((index === 0 ? scope.modelMax : scope.modelMin) - scope.min) / range) * 100;
+
+                                    if (currentClick[0] === "x") {
+                                        return;
+                                    }
+
+                                    // calculate deltas
+                                    currentClick[0] -= originalClick[0];
+                                    currentClick[1] -= originalClick[1];
+
+                                    // has movement occurred on either axis?
+                                    movement = [
+                                        (previousClick[0] !== currentClick[0]), (previousClick[1] !== currentClick[1])
+                                    ];
+
+                                    // propose a movement
+                                    proposal = originalPosition + ((currentClick[orientation] * 100) / (orientation ? $slider.height() : $slider.width()));
+
+                                    // normalize so it can't move out of bounds
+                                    proposal = restrict(proposal);
+
+                                    if (scope.preventEqualMinMax) {
+
+                                        if (per === 0) {
+                                            per = (1 / range) * 100; // restrict to 1
+                                        }
+
+                                        if (index === 0) {
+                                            otherModelPosition = otherModelPosition - per;
+                                        } else if (index === 1) {
+                                            otherModelPosition = otherModelPosition + per;
+                                        }
+                                    }
+
+                                    // check which handle is being moved and add / remove margin
+                                    if (index === 0) {
+                                        proposal = proposal > otherModelPosition ? otherModelPosition : proposal;
+                                    } else if (index === 1) {
+                                        proposal = proposal < otherModelPosition ? otherModelPosition : proposal;
+                                    }
+
+                                    if (scope.step > 0) {
+                                        // only change if we are within the extremes, otherwise we get strange rounding
+                                        if (proposal < 100 && proposal > 0) {
+                                            proposal = Math.round(proposal / per) * per;
+                                        }
+                                    }
+
+                                    if (proposal > 95 && index === 0) {
+                                        $handles.eq(0).css('z-index', 3);
+                                    } else {
+                                        $handles.each(function () {
+                                            this.css('z-index', '');
+                                        });
+                                    }
+
+                                    if (movement[orientation] && proposal != previousProposal) {
+
+                                        var lastMin = scope.modelMin;
+                                        var newMin = parseFloat(parseFloat((((proposal * range) / 100) + scope.min)).toFixed(scope.decimalPlaces));
+                                        var lastMax = scope.modelMax;
+                                        var newMax = parseFloat(parseFloat((((proposal * range) / 100) + scope.min)).toFixed(scope.decimalPlaces));
+
+                                        // update model as we slide
+                                        scope.modelMax += (newMin - lastMin);
+                                        scope.modelMin = scope.modelMax > scope.max ? lastMin : newMin;
+
+                                        // update angular
+                                        scope.$apply();
+
+                                        previousProposal = proposal;
+
+                                    }
+
+                                    previousClick = currentClick;
+
+                                }).bind(offEvent, function() {
+
+                                    if (angular.isFunction(scope.onHandleUp)) {
+                                        scope.onHandleUp();
+                                    }
+
+                                    // unbind listeners
+                                    $document.off(moveEvent);
+                                    $document.off(offEvent);
+
+                                    angular.element('body').removeClass('ngrs-touching');
+
+                                    // cancel down flag
+                                    down = false;
+
+                                    // remove down and over class
+                                    $handles.each(function () {
+                                        this.removeClass('ngrs-down');
+                                        this.removeClass('ngrs-over');
+                                    });
+
+                                    // remove active class
+                                    $slider.removeClass('ngrs-focus');
+                                    join.removeClass(handleDownClass);
+
+                                });
+                            }
+
+                        }).on(overEvent, function () {
+                            $handles.each(function () {
+                                this.addClass('ngrs-over');
+                            });
+                        }).on(outEvent, function () {
+                            if (!down) {
+                                $handles.each(function () {
+                                    this.removeClass('ngrs-over');
+                                });
+                            }
+                        });
+                    }
+
                     function throwError(message) {
                         scope.disabled = true;
                         throw new Error('RangeSlider: ' + message);
@@ -677,6 +853,9 @@
                     // bind events to each handle
                     handleMove(0);
                     handleMove(1);
+
+                    // bind events to the range `join`
+                    handleRangeMove(0);
 
                 }
             };
